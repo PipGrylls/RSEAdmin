@@ -58,20 +58,6 @@
                     class="fa fa-arrow-circle-right"></i></a>
         </div>
     </div>
-    <div class="col-md-3 col-xs-6">
-        <div class="small-box bg-red">
-            <div class="inner">
-                <h3>{{outstanding_invoices}}</h3>
-
-                <p>Oustanding Invoices</p>
-            </div>
-            <div class="icon">
-                <i class="ion ion-card"></i>
-            </div>
-            <a href="{% url 'serviceoutstanding' %}" class="small-box-footer">More info <i
-                    class="fa fa-arrow-circle-right"></i></a>
-        </div>
-    </div>
 </div>
 
 <div class="row">
@@ -117,7 +103,7 @@
                 </div>
             </div>
             <div class="box-footer clearfix">
-                <a href="{% url 'project_new' %}" class="btn btn-sm btn-info btn-flat pull-left">Create New Project</a>
+                <a href="{% url 'project_new_directly_incurred' %}" class="btn btn-sm btn-info btn-flat pull-left">Create New Project</a>
                 <a href="{% url 'projects' %}" class="btn btn-sm btn-default btn-flat pull-right">View All Projects</a>
             </div>
         </div>
@@ -181,15 +167,6 @@
             </div>
         {% endif %}
 
-        {% if danger_service_ended_not_invoiced %}
-            <div class="callout callout-danger">
-                <h4>Service Projects Completed but Not Invoiced!</h4>
-
-                <p>There are {{danger_service_ended_not_invoiced}} service projects which have completed but have not had the received invoice date completed.</p>
-                <a href="{% url 'serviceoutstanding' %}?schedule_filter=Completed&status_filter=Funded" class="small-box-footer">View Invoices and Fix <i class="fa fa-arrow-circle-right"></i></a>
-            </div>
-        {% endif %}
-
         {% if warning_starting_not_funded %}
             <div class="callout callout-warning">
                 <h4>Projects Starting but not Funded!</h4>
@@ -199,14 +176,6 @@
             </div>
         {% endif %}
 
-        {% if warning_service_started_not_invoiced %}
-            <div class="callout callout-warning">
-                <h4>Service Projects Started but Not Invoiced!</h4>
-
-                <p>There are {{warning_service_started_not_invoiced}} active service projects which which have not had the received invoice date completed.</p>
-                <a href="{% url 'serviceoutstanding' %}?schedule_filter=Active" class="small-box-footer">View Invoices and Fix <i class="fa fa-arrow-circle-right"></i></a>
-            </div>
-        {% endif %}
 
         <div class="box box-default">
             <div class="box-header with-border">

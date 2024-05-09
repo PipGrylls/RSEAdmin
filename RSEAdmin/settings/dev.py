@@ -10,11 +10,11 @@ SECRET_KEY = ')-x8s!s6jxz2(^ni8i&7xv!dcz+ov^q26psdlt89n1%c#k_v6!'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = TEMPLATE_DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Database
-# https://docs.djangoproject.com/en/1.11/ref/settings/#databases
+# https://docs.djangoproject.com/en/1.11/ref/settings/#database
 DEV_CONTAINER = os.getenv('DEV_CONTAINER')
 
 # Use Postgres with containers
@@ -27,7 +27,7 @@ if DEV_CONTAINER is not None:
             'NAME': DATABASE_NAME,
             'USER': os.getenv('DATABASE_USER', 'django'),
             'PASSWORD': os.getenv('DATABASE_PASSWORD', 'django_postgres'),
-            'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+            'HOST': os.getenv('DATABASE_HOST', 'localhost'), 
             'PORT': int(os.getenv('DATABASE_PORT', '5432')),
             # Test database
             # https://docs.djangoproject.com/en/4.0/topics/testing/overview/#the-test-database

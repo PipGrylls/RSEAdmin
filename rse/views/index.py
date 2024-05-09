@@ -54,7 +54,6 @@ def index_admin(request: HttpRequest) -> HttpResponse:
     # settings
     view_dict['HOME_PAGE_RSE_MIN_CAPACITY_WARNING_LEVEL'] = settings.HOME_PAGE_RSE_MIN_CAPACITY_WARNING_LEVEL
     view_dict['HOME_PAGE_DAYS_SOON'] = settings.HOME_PAGE_DAYS_SOON
-    
 
     # HIGHTLIGHT: active projects
     active_funded_projects = Project.objects.filter(start__lte=now, end__gt=now, status=Project.FUNDED).count()
@@ -63,10 +62,6 @@ def index_admin(request: HttpRequest) -> HttpResponse:
     # HIGHTLIGHT: projects under review
     review_projects = Project.objects.filter(status=Project.REVIEW).count()
     view_dict['review_projects'] = review_projects
-
-    # HIGHTLIGHT: Service projects with outstanding invoices
-    outstanding_invoices = ServiceProject.objects.filter(internal=False, invoice_received=None).count()
-    view_dict['outstanding_invoices'] = outstanding_invoices
 
     # Latest projects added 
     lastest_projects = Project.objects.all().order_by('-created')[0:settings.HOME_PAGE_NUMBER_ITEMS]
@@ -79,14 +74,10 @@ def index_admin(request: HttpRequest) -> HttpResponse:
     # WARNINGS
     warning_starting_not_funded =  Project.objects.filter(Q(status=Project.PREPARATION) | Q(status=Project.REVIEW)).filter(start__gt=now, start__lte=soon).count()
     view_dict['warning_starting_not_funded'] = warning_starting_not_funded
-    warning_service_started_not_invoiced =  ServiceProject.objects.filter(internal=False, start__lte=now, end__gt=now, invoice_received=None).count()
-    view_dict['warning_service_started_not_invoiced'] = warning_service_started_not_invoiced
 
     # DANGERS
     danger_started_not_funded =  Project.objects.filter(Q(status=Project.PREPARATION) | Q(status=Project.REVIEW)).filter(start__lte=now, end__gte=now).count()
     view_dict['danger_started_not_funded'] = danger_started_not_funded
-    danger_service_ended_not_invoiced =  ServiceProject.objects.filter(status=Project.FUNDED, internal=False, end__lt=now, invoice_received=None).count()
-    view_dict['danger_service_ended_not_invoiced'] = danger_service_ended_not_invoiced
 
     return render(request, 'index_admin.html', view_dict)
 
@@ -135,15 +126,12 @@ def index_rse(request: HttpRequest) -> HttpResponse:
     view_dict['HOME_PAGE_DAYS_SOON'] = settings.HOME_PAGE_DAYS_SOON
     view_dict['MAX_END_DATE_FILTER_RANGE'] = Project.max_end_date()
     view_dict['MIN_START_DATE_FILTER_RANGE'] = Project.min_start_date()
-    
 
     return render(request, 'index_rse.html', view_dict)
 
 
-
 @login_required
 def index(request: HttpRequest) -> HttpResponse:
-
     # catch admin users
     if request.user.is_superuser:
         return index_admin(request)

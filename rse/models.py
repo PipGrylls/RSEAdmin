@@ -36,233 +36,7 @@ class TypedQuerySet(Generic[T]):
         pass
 
 
-class SalaryValue():
-    """
-    Class to represent a salary calculation.
-    Has a salary aa dictionary for each to log how the salary/overhead was calculated (for each chargeable period)
-    """
-    def __init__(self):
-        self.staff_cost = 0
-        self.cost_breakdown = []
-        self.allocation_breakdown = {}
-        self.oncosts_multiplier = settings.ONCOSTS_SALARY_MULTIPLIER
-
-    def add_staff_cost(self, salary_band, from_date: date, until_date: date, percentage: float = 100.0):
-        cost_in_period = SalaryBand.salaryCost(days=(until_date - from_date).days, salary=salary_band.salary, percentage=percentage)
-        self.staff_cost += cost_in_period
-        self.cost_breakdown.append({'from_date': from_date, 'until_date': until_date, 'percentage': percentage, 'salary_band': deepcopy(salary_band), 'staff_cost': cost_in_period})
-
-    def add_salary_value_with_allocation(self, allocation, salary_value):
-        self.staff_cost += salary_value.staff_cost
-        self.allocation_breakdown[allocation] = salary_value.cost_breakdown
-        self.cost_breakdown.extend(salary_value.cost_breakdown)
-
-    @property
-    def value(self) -> float:
-        return self.staff_cost * self.oncosts_multiplier
-
-
 # Start of the models
-
-class FinancialYear(models.Model):
-    """
-    Year represents a financial year starting in August of the year field (not an academic year of Sept to Sept).
-    """
-    year = models.IntegerField(primary_key=True)  # Must relate to a financial year
-    
-    def start_date(self) -> date:
-        """Get start date of the financial year."""
-        return date(self.year, 8, 1)
-
-    def end_date(self) -> date:
-        """Get end date of the financial year."""
-        return self.start_date() + timedelta(days=364)
-
-    def date_in_financial_year(self, date: date) -> bool:
-        """
-        Functions checks is a date is in the finical year represented
-        """
-        return date >= self.start_date() and date <= self.end_date()
-
-    def __str__(self) -> str:
-        return str(self.year)
-
-
-class SalaryBand(models.Model):
-    """
-    Salary band represents a grade point and salary for a university staff member.
-    See https://www.sheffield.ac.uk/hr/thedeal/pay
-    Start and end date of financial year is hard coded as 1st August
-    """
-    grade = models.IntegerField(default=1)
-    grade_point = models.IntegerField(default=1)
-    salary = models.DecimalField(max_digits=8, decimal_places=2)
-    year = models.ForeignKey(FinancialYear, on_delete=models.PROTECT)       # Don't allow a year to be removed if there are salary bands associated with it 
-    increments = models.BooleanField(default=True)                          # Increments if in normal range
-
-
-    def __str__(self) -> str:
-        return f"{self.grade}.{self.grade_point} ({self.year}): £{self.salary}"
-
-    @property
-    def short_str(self) -> str:
-        return f"{self.grade}.{self.grade_point} ({self.year})"
-
-    def salary_band_after_increment(self):
-        """
-        Provides the next salary band object after a single increment.
-        Grades which increments will use the next available grade point.  Grades which do not increment (exceptional range) will return the same salary band.
-        """
-
-        # check first to see if salary band can increment
-        if self.increments:
-            # Find next salary band with incremented year
-            g = self.grade
-            gp = self.grade_point + 1
-            y = self.year.year
-            sbs = SalaryBand.objects.filter(grade=g, grade_point=gp, year__year=y)  # order by year?
-
-            # Result of database query should be unique if next years data is available
-            if sbs:
-                sb = sbs[0]
-
-                # adjust object if current salary band is based off estimates (this can occur for salaries projecting into future)
-                if hasattr(self, 'estimated'):
-                    sb.estimated = True
-                    sb.inflation_years = self.inflation_years
-                    sb.salary = round(Decimal(float(sb.salary) * (1.03**sb.inflation_years)), 2)  # compound interest
-
-                return sb
-            raise ObjectDoesNotExist('Incomplete salary data in database. Could not find a valid increment for current salary band.')
-
-        # salary band does not increment so return self
-        else:
-            return self
-
-    def salary_band_next_financial_year(self):
-        """
-        Provides the salary band for the next financial year
-        Normal behaviour is to use the next years financial data. If there is no next year financial data then the current years financial data is used.
-        Grade point should not change as this represents just the salary change in August which is the inflation adjustment.
-        """
-        # Query database to find a salary band for next years financial data
-        g = self.grade
-        gp = self.grade_point
-        y = self.year.year + 1
-        sbs = SalaryBand.objects.filter(grade=g, grade_point=gp, year__year=y)
-
-        # Should be unique if next years data is available
-        if sbs:
-            return sbs[0]
-        # There is no more salary band data (probably not released yet)
-        else:
-            # Return current salary band
-            # Assume 3% inflation (modify salary but DO NOT SAVE)
-            self.salary = round(Decimal(float(self.salary) * 1.03), 2)
-            self.estimated = True
-            # track years fo compound inflation
-            if hasattr(self, 'inflation_years'):
-                self.inflation_years += 1
-            else:
-                self.inflation_years = 1
-            return self
-
-    @staticmethod
-    def spans_financial_year(start: date, end: date) -> bool:
-        """
-        Static method to determine if a date range spans a financial year.
-        Important for considering inflation adjustments.
-        """
-        # Catch error
-        if start > end:
-            raise ValueError('Start date after end date')
-
-        # Next financial year end from start date
-        if start.month >= 8:
-            n_fy_end = date(start.year + 1, 7, 31)
-        else:
-            n_fy_end = date(start.year, 7, 31)
-
-        return end > n_fy_end
-
-    @staticmethod
-    def spans_calendar_year(start: date, end: date) -> bool:
-        """
-        Static method to determine if a date range spans a calendar year.
-        Important for considering grade point increments.
-        """
-        # Catch error
-        if start > end:
-            raise ValueError('Start date after end date')
-
-        return end.year > start.year
-
-    @staticmethod
-    def spans_salary_change(start: date, end: date) -> bool:
-        """
-        Static method to determine if a date range spans either a calendar or financial year.
-        """
-        # Catch error
-        if start > end:
-            return False
-
-        return SalaryBand.spans_calendar_year(start, end) or SalaryBand.spans_financial_year(start, end)
-
-    @staticmethod
-    def salaryCost(days, salary, percentage: float = 100.0) -> float:
-        """
-        Returns the salary cost for a number of days given a salary and FTE percentage
-        Multiples by the ON COSTS value
-        """
-        return (days / 365.0) * float(salary) * (float(percentage) / 100.0) * settings.ONCOSTS_SALARY_MULTIPLIER
-
-    def staff_cost(self, start: date, end: date, percentage: float = 100.0) -> SalaryValue:
-        """
-        Gets the staff cost for this salary band by considering any future increments
-        Start must be a date in the current financial year in which this salary band represents
-        End (up to not including )can be any date after start and may require increments
-        
-        Function operates in same way as salary_band_at_future_date
-
-        Note: Should only be used for costing project staff budget values (i.e. non allocated staff time) as 
-        RSEs may have increments which need to be considered in the costing.
-        """
-        # Check for obvious stupid
-        if end < start:
-            raise ValueError('End date is before start date')
-
-        # Now calculate the staff costs through iteration of chargeable periods (applying any increments)
-        # Note salary band data may be estimated in future years so the date of increment must be tracked rather than just the salary band
-        next_increment = start
-        next_sb = self
-        salary_value = SalaryValue()
-
-        # If the salary can change between the date range then advance increment or year
-        while (SalaryBand.spans_salary_change(next_increment, end)):
-
-            # Calculate next increment date
-            if next_increment.month < 8:   # If date is before financial year then date range spans financial year  
-                temp_next_increment = date(next_increment.year, 8, 1)  # calculate next increment date and salary band
-            else: # Doesn't span financial year so must span calendar year
-                temp_next_increment = date(next_increment.year + 1, 1, 1)
-
-            # Update salary cost
-            salary_value.add_staff_cost(salary_band=next_sb, from_date=next_increment, until_date=temp_next_increment, percentage=percentage)
-            # Calculate the next salary band
-            # This cant be done before cost calculation salary_band_next_financial_year may modify the next_sb object
-            if next_increment.month < 8:  # If date is before financial year then date range spans financial year
-                next_sb = next_sb.salary_band_next_financial_year()
-            else:  # Doesn't span financial year so must span calendar year
-                next_sb = next_sb.salary_band_after_increment()
-
-            # update chargeable period date and band
-            next_increment = temp_next_increment
-        
-        # Final salary cost for period not spanning a salary change
-        salary_value.add_staff_cost(salary_band=next_sb, from_date=next_increment, until_date=end, percentage=percentage)
-        return salary_value
-
-
 class Client(models.Model):
     """
     Client represents a client of RSE work. Usually a named academic of university staff member in a given department, professional service or research institute.
@@ -306,11 +80,7 @@ class RSE(models.Model):
 
     @property 
     def employed_from(self):
-        sgcs = SalaryGradeChange.objects.filter(rse=self).order_by('date')
-        if len(sgcs) > 0:
-            return sgcs[0].date
-        else:
-           return None
+        return None
 
     @property
     def current_employment(self):
@@ -524,116 +294,6 @@ class RSE(models.Model):
         g = hash(self.user.last_name) % 255
         b = hash(self.user.first_name + self.user.last_name) % 255
         return {"r": r, "g": g, "b": b}
-
-
-class SalaryGradeChange(models.Model):
-    """
-    SalaryGradeChange represents a change (or initial setting) of an RSE salary band
-    A SalaryGradeChange may be required where there is promotion or exceptional progression through grade bands.
-    All salary grade changes are assumed to be from 1st August as this is the date in which finical year runs.
-    This is different to annual increments which occur in January and are considered when calculating salary.
-
-    """
-    rse = models.ForeignKey(RSE, on_delete=models.CASCADE)
-    salary_band = models.ForeignKey(SalaryBand, on_delete=models.PROTECT)
-    date = models.DateField()
-
-    def is_starting_salary(self):
-        """
-        Returns True if this is the first salary grade change for a given RSE.
-        If True this represents the starting salary.
-        """
-        # get any salary grade changes which may occur before this date
-        sgcs = SalaryGradeChange.objects.filter(rse=self.rse, date__lt=self.date)
-
-        if sgcs:
-            return False
-        else:
-            return True
-
-    def eliagable_for_increment(self, date:date):
-        """
-        Staff are only eliagable for increment if starting grade change occurs within first six months of the year
-        """
-        if self.is_starting_salary() and self.date.month > 7 and date.year <= self.date.year+1:
-            return False
-        else:
-            return True
-
-
-        
-
-    # Gets the incremented salary given some point in the future
-    def salary_band_at_future_date(self, future_date):
-        """
-        Returns a salary band at some date in the future.
-        The SalaryGradeChange represents a starting point for the calculation of future grade points and as such can be used to apply increments
-        """
-        # Check for obvious stupid
-        if future_date < self.salary_band.year.start_date():
-            raise ValueError('Future salary can not be calculated from dates in the past')
-            
-        # Check if there is a salary grade change at a later date but before specified date
-        sgc = self.rse.lastSalaryGradeChange(future_date)
-        if not sgc.id == self.id:
-            # there is a more recent salary grade change so use it
-            return sgc.salary_band_at_future_date(future_date)
-
-        # Get the salary band and start date of the salary grade change
-        # Note salary band data may be estimated in future years so the date of increment must be tracked
-        next_increment = sgc.date  #  date of the salary grade change
-        next_sb = sgc.salary_band
-        # First increment should be skipped if this salary grade change is the first and represents employment in last six months of the year
-        # Note: August adjustment is not skipped if employed in June
-        skip_increment = False
-        if sgc.is_starting_salary() and sgc.date.month >=7:
-            skip_increment = True
-
-        # If the salary can change between the date range then advance increment or year
-        while (SalaryBand.spans_salary_change(next_increment, future_date)):
-            # If date is before financial year then date range spans financial year
-            if next_increment.month < 8:
-                next_increment = date(next_increment.year, 8, 1)
-                next_sb = next_sb.salary_band_next_financial_year()
-            # Doesn't span financial year so must span calendar year
-            else:
-                next_increment = date(next_increment.year + 1, 1, 1)
-                if skip_increment:
-                    skip_increment = False 
-                else:
-                    next_sb = next_sb.salary_band_after_increment()
-
-        return next_sb
-
-    def spans_salary_grade_change(self, start: date, end: date) -> bool:
-        """
-        Calculates if a salary change change occurs between the dates
-        """
-
-        # get any possible salary grade change which occur within date range
-        sgcs = SalaryGradeChange.objects.filter(rse=self.rse, date__gt=start, date__lte=end)
-
-        if sgcs:
-            return True
-        else:
-            return False
-
-    def next_salary_grade_change(self, start: date, end: date) -> Union[SalaryGradeChange, None]:
-        """
-        Returns the next salary grade change if there is one or None
-        """
-        # get any possible salary grade change which occur within date range
-        sgcs = SalaryGradeChange.objects.filter(rse=self.rse, date__gt=start, date__lte=end).order_by('-date')
-        if sgcs:
-            return sgcs[0]
-        else:
-            return None
-
-
-    def __str__(self) -> str:
-        return (f"{self.rse.user.first_name} {self.rse.user.last_name}: Grade "
-                f"{self.salary_band.grade}.{self.salary_band.grade_point}"
-                f"({self.salary_band.year})")
 
 
 class Project(PolymorphicModel):
@@ -877,8 +537,7 @@ class DirectlyIncurredProject(Project):
     DirectlyIncurredProject is a cost recovery project used to allocate an RSE for a percentage of time given the projects start and end dates
     Allocations may span beyond project start and end dates as RSE salary cost may be less than what was costed on project.
     
-    Previously the 'Allocated' project, this model was renamed because it does not fit with terminology used at UoS. 
-    Allocated is generally an academic member of staff rather than charged to the grant.
+    This is the only project as SCRTP decided to remove the ServiceProject model.
     """
     
     percentage = models.FloatField(validators=[MinValueValidator(0), MaxValueValidator(1000)])
@@ -886,10 +545,6 @@ class DirectlyIncurredProject(Project):
     FTE percentage for the project. This was increased from 100 because sometimes
     there are more than 100% FTE spent on the project.
     """
-    overheads = models.DecimalField(max_digits=8, decimal_places=2)
-    """Overheads are a pro rota amount per year."""
-    salary_band = models.ForeignKey(SalaryBand, on_delete=models.PROTECT)
-    """Don't allow salary band deletion if there are allocations associated with it."""
 
     @property
     def chargeable(self):
@@ -970,88 +625,6 @@ class DirectlyIncurredProject(Project):
         return self.percentage
 
 
-class ServiceProject(Project):
-    """
-    ServiceProject is a number of service days in which work should be undertaken. The projects dates set parameters for which the work can be undertaken but do not define the exact dates in which the work will be conducted. An allocation will convert the service days into an FTE equivalent so that time can be scheduled including holidays.
-    """
-    days = models.IntegerField(default=1)
-    """ Duration of the project in days. """
-    rate = models.DecimalField(max_digits=8, decimal_places=2)
-    """ Service rate """
-    charged = models.BooleanField(default=True)
-    """ Should staff time be charged to service account """
-    invoice_received = models.DateField(null=True, blank=True)
-    """ Whether the invoice is received, if yes, specifies the date. """
-
-    @property
-    def chargeable(self):
-        """ 
-        Indicates if the project is chargeable in a cost distribution. 
-        I.e. Internal projects are not chargeable and neither are non charged service projects. 
-        """
-        return not self.internal and self.charged
-
-    @staticmethod
-    def days_to_fte_days(days: int) -> int:
-        """
-        Duration is determined by number of service days adjusted for weekends and holidays
-        This maps service days (of which there are a fixed number if working days which are in settings file) to a FTE duration
-        Assumes WORKING_DAYS_PER_YEAR > 0. If you set this as zero your an idiot. 
-        """
-        return floor(days * (365.0 / settings.WORKING_DAYS_PER_YEAR))
-
-    
-    @property
-    def duration(self) -> int:
-        """
-        Use the available static method to convert days to FTE days
-        """
-        return ServiceProject.days_to_fte_days(self.days)
-
-    @property
-    def working_days(self) -> Optional[int]:
-        """ Number of paid service days """
-        return self.days
-
-    def value(self) -> float:
-        """
-        Value is determined by service days multiplied by rate
-        """
-        return self.days * float(self.rate)
-
-    def staff_budget(self) -> float:
-        """
-        Service projects don't have a staff budget as they have a number of service days.
-        Returns the project value (which includes overheads) which could in theory be entirely used to fund staff time.
-        """
-        return self.value()
-
-    def overhead_value(self, from_date: date = None, until_date: date = None, percentage: float = None):
-        """
-        Function calculates the value of any overheads generated.
-        For service projects there is no overhead just a surplus depending on staff costs and invoice date. As such this function should not be used for service projects.
-        """
-        # Use the static salary band function to convert days and rate into a value
-        return 0
-
-    @property
-    def type_str(self) -> str:
-        """
-        Returns a plain string representation of the project type
-        """
-        return "Service"
-
-    @property
-    def is_service(self) -> bool:
-        """ Implemented by concrete classes """
-        return True
-
-    @property
-    def fte(self) -> int:
-        """ Returns the FTE equivalent (always 100% days) """
-        return 100
-
-
 class RSEAllocationManager(models.Manager):
     """
     RSEAllocation objects are transactional in that they are never actually deleted they are just flagged as deleted
@@ -1066,6 +639,7 @@ class RSEAllocationManager(models.Manager):
         else:
             # default is to return only non deleted items
             return self.get_queryset()
+
 
 class RSEAllocation(models.Model):
     """
@@ -1120,22 +694,6 @@ class RSEAllocation(models.Model):
         current_days = (now - self.start).days
 
         return float(current_days) / float(total_days) * 100 if total_days != 0 else 100
-
-    def staff_cost(self, start=None, end=None) -> SalaryValue:
-        """
-        Returns the cost of a member of staff over a duration (if provided) or for full allocation if not
-        """
-        # If no time period then use defaults for project
-        # then limit specified time period to allocation
-        if start is None or start < self.start:
-            start = self.start
-        if end is None or end > self.end:
-            end = self.end
-
-        # calculate the staff cost of the RSE between the date range given the salary band at the start of the cost query
-        salary_cost = self.rse.staff_cost(start, end, self.percentage)
-
-        return salary_cost
 
     def working_days(self, start: None, end: None) -> Optional[int]:
         """ Number of workings days in the allocation """

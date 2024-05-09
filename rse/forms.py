@@ -89,16 +89,6 @@ class FilterDateForm(forms.Form):
         self.fields['from_date'].initial = datetime.strftime(self.initial_date, '%d/%m/%Y')
 
 
-class ProjectTypeForm(forms.Form):
-    """
-    Class represents a filter form for filtering by date range and service type used by many views which display multiple project views.
-    Extends the filter range form by adding type and status fields
-    """
-
-    type = forms.ChoiceField(choices=(('S', 'Service'), ('D', 'Directly Incurred')),
-                             widget=forms.Select(attrs={'class': 'form-control pull-right'}))
-
-
 class FilterProjectForm(FilterDateRangeForm):
     """
     Filter form for filtering by date range and service type used by many views
@@ -245,7 +235,7 @@ class DirectlyIncurredProjectForm(forms.ModelForm):
 
     class Meta:
         model = DirectlyIncurredProject
-        fields = ['proj_costing_id', 'name', 'description', 'client', 'internal', 'start', 'end', 'status', 'percentage', 'overheads', 'salary_band', 'created', 'creator']
+        fields = ['proj_costing_id', 'name', 'description', 'client', 'internal', 'start', 'end', 'status', 'percentage', 'created', 'creator']
         widgets = {
             'proj_costing_id': forms.TextInput(attrs={'class': 'form-control'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -254,8 +244,6 @@ class DirectlyIncurredProjectForm(forms.ModelForm):
             'internal': forms.CheckboxInput(),
             'status': forms.Select(choices=Project.STATUS_CHOICES, attrs={'class': 'form-control pull-right'}),
             'percentage': forms.NumberInput(attrs={'class': 'form-control'}),
-            'overheads': forms.NumberInput(attrs={'class': 'form-control'}),
-            'salary_band': forms.Select(attrs={'class': 'form-control'}),
             'creator': forms.HiddenInput(),
             'created': forms.HiddenInput(),
         }
@@ -307,107 +295,6 @@ class DirectlyIncurredProjectForm(forms.ModelForm):
         return cleaned_end
 
 
-class ServiceProjectForm(forms.ModelForm):
-    """
-    Class for creation and editing of a project
-    """
-
-    # Fields are created manually to set the date input format
-    start = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
-                            attrs={'class': 'form-control'}),
-                            input_formats=('%d/%m/%Y',))
-    end = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
-                          attrs={'class': 'form-control'}),
-                          input_formats=('%d/%m/%Y',))
-    invoice_received = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
-                                       attrs={'class': 'form-control'}),
-                                       input_formats=('%d/%m/%Y',),
-                                       required=False)
-
-    class Meta:
-        model = ServiceProject
-        fields = ['proj_costing_id', 'name', 'description', 'client', 'internal', 'start', 'end', 'status', 'days', 'rate', 'charged', 'invoice_received', 'created', 'creator']
-        widgets = {
-            'proj_costing_id': forms.TextInput(attrs={'class': 'form-control'}),
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control'}),
-            'client': forms.Select(attrs={'class': 'form-control'}),
-            'internal': forms.CheckboxInput(),
-            'status': forms.Select(choices=Project.STATUS_CHOICES, attrs={'class': 'form-control pull-right'}),
-            'days': forms.NumberInput(attrs={'class': 'form-control'}),
-            'rate': forms.NumberInput(attrs={'class': 'form-control'}),
-            'charged': forms.CheckboxInput(),
-            'creator': forms.HiddenInput(),
-            'created': forms.HiddenInput(),
-        }
-
-    def clean(self):
-        cleaned_data = super(ServiceProjectForm, self).clean()
-        errors = {}
-
-        # Validation checks that the dates are correct (no need to raise errors if fields are empty as they are required so superclass will have done this)
-        if 'start' in cleaned_data and 'end' in cleaned_data:
-            # end cant be beofre start
-            if cleaned_data['start'] > cleaned_data['end']:
-                errors['end'] = ('Project end date can not be before start date')
-
-            # duration must be long enough to complete the project
-            if cleaned_data['days']:
-                fte_days = ServiceProject.days_to_fte_days(cleaned_data['days'])
-                duration = (cleaned_data['end'] - cleaned_data['start']).days
-                if fte_days > duration:
-                    errors['end'] = (f"Project duration is not long enough for the {fte_days} fte days required to deliver {cleaned_data['days']} service days.")
-
-        if errors:
-            raise ValidationError(errors)
-
-    def clean_start(self):
-        """
-        Cant change the start date if there are dependant allocations which start before the proposed date
-        """
-        cleaned_start = self.cleaned_data['start']
-
-        # Cant change start and end date if there are existing allocations outside of the period
-        if self.instance:
-            # Check validation if using strict allocations
-            if settings.STRICT_ALLOCATIONS:
-                # check for allocations on project which end after the proposed start date
-                should_be_empty = RSEAllocation.objects.filter(project=self.instance, start__lt=cleaned_start)
-                if should_be_empty:
-                    raise ValidationError('There are current allocations on this project which start before the proposed start date')
-
-        return cleaned_start
-
-    def clean_end(self):
-        """
-        Cant change the end date if there are dependant allocations which end after the proposed date
-        """
-        cleaned_end = self.cleaned_data['end']
-
-        # Cant change start and end date if there are existing allocations outside of the period
-        if self.instance:
-            # Check validation if using strict allocations
-            if settings.STRICT_ALLOCATIONS:
-                # check for allocations on project which end after the proposed start date
-                should_be_empty = RSEAllocation.objects.filter(project=self.instance, end__gt=cleaned_end)
-                if should_be_empty:
-                    raise ValidationError('There are current allocations on this project which end after the proposed end date')
-
-        return cleaned_end
-        
-    def clean_rate(self):
-        """
-        Check the service rate is greater than 0
-        """
-        cleaned_rate=self.cleaned_data['rate']
-
-        # Service rate must be greater than 0
-        if cleaned_rate <= 0:
-            raise ValidationError('The service rate must be greater than 0')
-
-        return cleaned_rate
-               
-            
 class ClientForm(forms.ModelForm):    
 
     """
@@ -546,10 +433,6 @@ class NewRSEUserForm(forms.ModelForm):
     employed_until = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
                                      attrs={'class': 'form-control'}),
                                      input_formats=('%d/%m/%Y',))
-    salary_band = forms.ModelChoiceField(queryset=SalaryBand.objects.all(),
-                                         empty_label=None,
-                                         required=True,
-                                         widget=forms.Select(attrs={'class': 'form-control pull-right'}))  # dynamically filtered (JS)
 
     class Meta:
         model = RSE
@@ -568,122 +451,3 @@ class NewRSEUserForm(forms.ModelForm):
 
         if errors:
             raise ValidationError(errors)
-
-
-class NewSalaryBandForm(forms.ModelForm):
-    """
-    Class represents a form for creating a new salary band with a given year
-    """
-
-    def __init__(self, *args, **kwargs):
-        # if no instance then we expect a year to set as initial value
-        if 'instance' not in kwargs:
-            if 'year' not in kwargs:
-                raise TypeError("NewSalaryBandForm requires either an 'instance' or a 'year'")
-            year = kwargs.pop('year', None)
-        else:
-            year = kwargs['instance'].year
-        super(NewSalaryBandForm, self).__init__(*args, **kwargs)
-        self.fields['year'].initial = year
-
-    class Meta:
-        model = SalaryBand
-        fields = ['grade', 'grade_point', 'year', 'salary', 'increments']
-        widgets = {
-            'grade': forms.NumberInput(attrs={'class': 'form-control'}),
-            'grade_point': forms.NumberInput(attrs={'class': 'form-control'}),
-            'year': forms.HiddenInput(),
-            'salary': forms.NumberInput(attrs={'class': 'form-control'}),
-            'increments': forms.CheckboxInput(),
-        }
-
-
-class NewFinancialYearForm(forms.ModelForm):
-    """
-    Class represents a form for creating a new salary band with a given year
-    """
-    copy_from = forms.ModelChoiceField(queryset=FinancialYear.objects.all(), 
-                                       empty_label="",
-                                       required=False,
-                                       widget=forms.Select(attrs={'class': 'form-control pull-right'}))
-
-    class Meta:
-        model = FinancialYear
-        fields = ['year']
-        widgets = {
-            'year': forms.NumberInput(attrs={'class': 'form-control'}),
-        }
-
-    def save(self, commit=True):
-        """ Override to copy salary band data from previous finanical year """
-        financial_year = super(NewFinancialYearForm, self).save(commit=False)
-
-        if commit:
-            # save the year
-            financial_year.save()
-
-            # copy salary band data
-            if self.cleaned_data["copy_from"]:
-                copy_year = self.cleaned_data["copy_from"]
-                sbs = SalaryBand.objects.filter(year=copy_year)
-                for sb in sbs:
-                    sb.pk = None  # remove pk to save as new item in database
-                    sb.year = financial_year
-                    sb.save()
-
-        return financial_year
-
-
-class SalaryGradeChangeForm(forms.ModelForm):
-    """
-    Class represents a form for a salary grade change for an RSE
-    """
-
-    date = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
-                           attrs={'class': 'form-control'}),
-                           input_formats=('%d/%m/%Y',))
-
-    def __init__(self, *args, **kwargs):
-        """ Set the initial data """
-        if 'rse' not in kwargs:
-            raise TypeError("SalaryGradeChangeForm missing required argument: 'rse'")
-        rse = kwargs.pop('rse', None)
-
-        # call super
-        super(SalaryGradeChangeForm, self).__init__(*args, **kwargs)
-
-        # set RSE (as it is a hidden field)
-        self.fields['rse'].initial = rse
-
-        # not required as query set will be dynamically loaded via ajax
-        # self.fields['salary_band'].queryset = SalaryBand.objects.all()
-
-    def clean(self):
-        cleaned_data = super(SalaryGradeChangeForm, self).clean()
-        errors = {}
-
-        if cleaned_data['rse'] and cleaned_data['date']:
-            employed_until = cleaned_data['rse'].employed_until
-            d = cleaned_data['date']
-
-            # Check that there is not already a salary grade change for the specified year
-            financial_year = d.year
-            if d.month < 8:
-                financial_year -= 1
-            if SalaryGradeChange.objects.filter(rse=cleaned_data['rse'], salary_band__year=financial_year):
-                errors['date'] = ('A salary grade change for the specified year already exists for the RSE!')
-
-            # Check that the salary grade change is not after the RSE is employed
-            if d > employed_until:
-                errors['date'] = ('Proposed salary grade change is after the rse is employed')
-
-        if errors:
-            raise ValidationError(errors)
-
-    class Meta:
-        model = SalaryGradeChange
-        fields = ['rse', 'salary_band', 'date']
-        widgets = {
-            'rse': forms.HiddenInput(),
-            'salary_band': forms.Select(attrs={'class': 'form-control pull-right'})  # choices set dynamically
-        }

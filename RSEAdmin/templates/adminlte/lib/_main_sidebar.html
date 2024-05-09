@@ -12,13 +12,11 @@
 			</span>
 		</a>
 		<ul class="treeview-menu" style="">
-			<li {% if request.resolver_match.url_name == "project_new"%} class="active" {% endif %} ><a href="{% url 'project_new' %}"><i class="fa fa-circle-o"></i>Add Project</a></li>
+			<li {% if request.resolver_match.url_name == "project_new_directly_incurred"%} class="active" {% endif %} ><a href="{% url 'project_new_directly_incurred' %}"><i class="fa fa-circle-o"></i>Add Project</a></li>
 			<li {% if request.resolver_match.url_name == "client_new"%} class="active" {% endif %} ><a href="{% url 'client_new' %}"><i class="fa fa-circle-o"></i>Add Client</a></li>
 			{% if request.user.is_superuser %}
 			<li {% if request.resolver_match.url_name == "users"%} class="active" {% endif %} ><a href="{% url 'users' %}"><i class="fa fa-circle-o"></i>All Users</a></li>
 			<li {% if request.resolver_match.url_name == "user_new"%} class="active" {% endif %} ><a href="{% url 'user_new' %}"><i class="fa fa-circle-o"></i>Add New User</a></li>
-			<li {% if request.resolver_match.url_name == "financialyears"%} class="active" {% endif %} ><a href="{% url 'financialyears' %}"><i class="fa fa-circle-o"></i>Financial Years</a></li>
-			<li {% if request.resolver_match.url_name == "financialyear_new"%} class="active" {% endif %} ><a href="{% url 'financialyear_new' %}"><i class="fa fa-circle-o"></i>New Financial Year</a></li>
 			{% endif %}
 		</ul>
 	</li>
@@ -38,27 +36,6 @@
 			<li {% if request.resolver_match.url_name == "commitment"%} class="active" {% endif %} ><a href="{% url 'commitment' %}"><i class="fa fa-circle-o"></i>Team &amp; Project Overview</a></li>
 		</ul>
 	</li>
-	
-	{% if request.user.is_superuser %}
-	<li class="treeview"">
-		<a href="#">
-			<i class="fa fa-dashboard"></i> <span>Reports</span>
-			<span class="pull-right-container">
-				<i class="fa fa-angle-left pull-right"></i>
-			</span>
-		</a>
-		<ul class="treeview-menu" style="">
-			<li {% if request.resolver_match.url_name == "allocations_recent"%} class="active" {% endif %} ><a href="{% url 'allocations_recent' %}"><i class="fa fa-circle-o"></i>Recent Allocations</a></li>
-			<li {% if request.resolver_match.url_name == "costdistributions"%} class="active" {% endif %} ><a href="{% url 'costdistributions' %}"><i class="fa fa-circle-o"></i>Cost Distributions</a></li>
-			<li {% if request.resolver_match.url_name == "rses_staffcosts"%} class="active" {% endif %} ><a href="{% url 'rses_staffcosts' %}"><i class="fa fa-circle-o"></i>RSE Costs</a></li>
-			<li {% if request.resolver_match.url_name == "serviceoutstanding"%} class="active" {% endif %} ><a href="{% url 'serviceoutstanding' %}"><i class="fa fa-circle-o"></i>Service Invoicing</a></li>
-			<li {% if request.resolver_match.url_name == "serviceincome"%} class="active" {% endif %} ><a href="{% url 'serviceincome' %}"><i class="fa fa-circle-o"></i>Service Income</a></li>
-			<li {% if request.resolver_match.url_name == "projects_income_summary"%} class="active" {% endif %} ><a href="{% url 'projects_income_summary' %}"><i class="fa fa-circle-o"></i>Project Costs &amp; Overheads</a></li>
-			<li {% if request.resolver_match.url_name == "projects_internal_summary"%} class="active" {% endif %} ><a href="{% url 'projects_internal_summary' %}"><i class="fa fa-circle-o"></i>Internal Project Costs</a></li>
-			<li {% if request.resolver_match.url_name == "financial_summary"%} class="active" {% endif %} ><a href="{% url 'financial_summary' %}"><i class="fa fa-circle-o"></i>Financial Summary</a></li>
-		</ul>
-	</li>
-	{% endif %}
 
 	{% timetracking_installed as timetracking %}
 	{% if timetracking %}
