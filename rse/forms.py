@@ -69,7 +69,10 @@ class FilterDateRangeForm(forms.Form):
 
     @property
     def years(self):
-        return FinancialYear.objects.all()
+        # This used to use objects.all() from FinancialYear which is not used in the SCRTP version
+        # return FinancialYear.objects.all()
+        # We will return a range directly with the years 2020 to 2040
+        return range(2020, 2041)
 
 
 class FilterDateForm(forms.Form):
