@@ -21,7 +21,6 @@
 				<div class="nav-tabs-custom">
 					<ul class="nav nav-tabs">
 					<li class="active"><a href="#tab_effort" data-toggle="tab">Effort View</a></li>
-					<li><a href="#tab_budget" data-toggle="tab">Budget View</a></li>
 					<li class="pull-right"><a href="{% url 'project_allocations_edit' project.id %}" class="text-muted" data-toggle="tooltip" title="" data-original-title="Edit project allocations"><i class="fa fa-edit"></i></a></li>
 					</ul>
 					<div class="tab-content">
@@ -65,52 +64,8 @@
 								</tbody>
 							</table>
 						</div>
-						<div class="tab-pane" id="tab_budget">
-							<table id="allocations_budget" class="table table-hover">
-								<thead>
-									<tr>
-										<th>RSE</th>
-										<th id="type">Start Date</th>
-										<th id="internal">End Date</th>
-										<th id="title">FTE</th>
-										<th id="duration">Duration (Days)</th>
-										<th id="staff_cost">Staff Cost</th>
-										<th id="allocaton">Allocation of Staff Budget</th>
-										<th id="allocation_label"></th>
-										<th id="delete"></th>
-									</tr>
-								</thead>
-								<tbody>
-										{% for a in allocations %}
-									<tr>
-										<td>{{ a.rse }}</td>
-										<td>{{ a.start }}</td>
-										<td>{{ a.end }}</td>
-										<td>{{ a.percentage }}</td>
-										<td>{{ a.duration }}</td>
-										<td>£{{ a.staff_cost|floatformat:2|intcomma }}</td>
-										<td>
-											<div class="progress progress-xs">
-												<div class="progress-bar progress-bar-primary " style="width: {{a.project_budget_percentage}}%"></div>
-											</div>
-										</td>
-										<td>
-											<span class="badge bg-light-blue">{{a.project_budget_percentage|dp2}} %</span>
-										</td>
-										<td>
-										
-										</td>
-									</tr>
-										{% endfor %}
-								</tbody>
-							</table>
-						</div>
 					</div>
 				</div>
-
-
-						
-					
 			</div>
 		</div>
 
@@ -118,10 +73,7 @@
 
 	<div class="col-md-4">
 		{% include 'includes/projectdetailsbox.html' with project=project summary_icon=True%}
-
 		{% include 'includes/projecteffortbox.html' with project=project %}
-		
-
 	</div>
 </div>
 
@@ -136,14 +88,6 @@
 <script type="text/javascript">
 	$(document).ready(function() {
 		$('#allocations_effort').DataTable({
-			pageLength: 25,
-			searching: false,
-			scrollX: false,
-		} );
-	} );
-
-	$(document).ready(function() {
-		$('#allocations_budget').DataTable({
 			pageLength: 25,
 			searching: false,
 			scrollX: false,

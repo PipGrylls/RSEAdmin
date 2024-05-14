@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 from django.utils import timezone
 from math import floor
 from typing import Optional, Dict
@@ -76,11 +76,8 @@ class RSE(models.Model):
     RSE represents a RSE staff member within the RSE team
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    employed_until = models.DateField()
-
-    @property 
-    def employed_from(self):
-        return None
+    employed_from = models.DateField(null=False, default=datetime(2024, 1, 1))
+    employed_until = models.DateField(null=False, default=datetime(2099, 1, 1))
 
     @property
     def current_employment(self):
@@ -88,7 +85,7 @@ class RSE(models.Model):
         Is the staff member currently employed
         """
         if not self.employed_from:
-            return False
+            return None
         else:
             now = timezone.now().date()
             return self.employed_from < now and self.employed_until > now
@@ -102,54 +99,6 @@ class RSE(models.Model):
         now = timezone.now().date()
         return sum(a.percentage for a in RSEAllocation.objects.filter(rse=self, start__lte=now, end__gt=now, project__status='F'))
 
-    def lastSalaryGradeChange(self, date: date = timezone.now().date()):
-        """
-        Gets the last salary grade change before the specified date (i.e. the last appropriate grade change)
-        """
-        sgcs = SalaryGradeChange.objects.filter(rse=self).order_by('-date')
-        for sgc in sgcs:
-            if sgc.date <= date:
-                return sgc
-        # Unable to find any data
-        raise ValueError('No Salary Data exists before specified date period for this RSE')
-
-    def firstSalaryGradeChange(self):
-        """
-        Gets the last salary grade change before the specified date (i.e. the last appropriate grade change)
-        """
-        sgcs = SalaryGradeChange.objects.filter(rse=self).order_by('date')
-        if len(sgcs) > 0:
-            return sgcs[0]
-        else:
-            raise ValueError('No Salary Data exists for this RSE')
-
-    def futureSalaryBand(self, date: date):
-        """
-        Gets the last valid salary grade change event.
-        Predicts salary data for provided date by incrementing.
-        This may be based on real grade changes in the future or estimated from current financial year increments (see `salary_band_after_increment` notes in `SalaryBand`)
-        """
-        return self.lastSalaryGradeChange(date).salary_band_at_future_date(date)
-
-    def employed_in_financial_year(self, year: int):
-        """
-        Returns True is the rse employment starts in the given financial year
-        """
-
-        if not self.employed_from:
-            return False
-
-        if self.employed_from.month >= 8:
-            if self.employed_from.year == year:
-                return True
-            else:
-                return False
-        else:
-            if self.employed_from.year == year+1:
-                return True
-            else:
-                return False
-
     def employed_in_period(self, from_date: date, until_date: date):
         """
         Returns True is the rse employment within the specified period
@@ -162,131 +111,6 @@ class RSE(models.Model):
             return True
         else:
             return False
-
-    def staff_cost(self, from_date: date, until_date: date, percentage:float = 100):
-        """
-        Calculates the staff cost  between a given period. This function must consider any increments, changes in financial
-        year as well as any additional salary grade changes. It works by iterating through chargeable periods looking for 
-        changes in staff salary. 
-
-        This is different to a salary bad staff cost as it also considers salary grade changes which may be the result of
-        promotion or exceptional increments.
-        """
-
-        # catch early case where there are no salary grade changes
-        if not self.employed_from:
-            return SalaryValue()
-
-        # Restrict from and until dates based off employment start and end
-        if self.employed_from > from_date:
-            from_date = self.employed_from
-        if self.employed_until < until_date:
-            until_date = self.employed_until
-
-        # Get the last salary grade charge for the RSE at the start of the cost query
-        sgc = self.lastSalaryGradeChange(from_date)
-
-        # Get the salary band at the start date of the cost query (will skip increments if required)
-        sb = sgc.salary_band_at_future_date(from_date)
-
-        # Now calculate the staff costs through iteration of chargeable periods (applying any increments)
-        # Note salary band data may be estimated in future years so the date of increment must be tracked rather than just the salary band
-        next_increment = from_date
-        next_sb = sb
-        salary_value = SalaryValue()
-
-        # Salary can change due to increment or a salary grade change
-        while SalaryBand.spans_salary_change(next_increment, until_date) or sgc.spans_salary_grade_change(next_increment, until_date):
-
-            # Need to know if grade change occurs before increment
-            temp_sgc = sgc.next_salary_grade_change(next_increment, until_date)
-            # if there is another salary grade change and this occurs before any increment
-            if temp_sgc and not SalaryBand.spans_salary_change(next_increment, temp_sgc.date):
-                temp_next_increment = temp_sgc.date
-                # calculate cost up to sgc
-                salary_value.add_staff_cost(salary_band=next_sb, from_date=next_increment, until_date=temp_next_increment, percentage=percentage)
-                # set the salary band and update the current salary grade change
-                next_sb = temp_sgc.salary_band
-                sgc = temp_sgc
-
-            # Calculate next increment date
-            elif next_increment.month < 8:   # If date is before financial year then date range spans financial year  
-                temp_next_increment = date(next_increment.year, 8, 1)  # calculate next increment date and salary band
-                # Update salary cost
-                salary_value.add_staff_cost(salary_band=next_sb, from_date=next_increment, until_date=temp_next_increment, percentage=percentage)
-                # Calculate the next salary band - this cant be done before cost calculation salary_band_next_financial_year may modify the next_sb object
-                next_sb = next_sb.salary_band_next_financial_year()
-
-            else: # Doesn't span financial year so must span calendar year
-                temp_next_increment = date(next_increment.year + 1, 1, 1)
-                # Update salary cost
-                salary_value.add_staff_cost(salary_band=next_sb, from_date=next_increment, until_date=temp_next_increment, percentage=percentage)
-                # only update the salary band if eliable for increment
-                if sgc.eliagable_for_increment(temp_next_increment):
-                    # Calculate the next salary band - this cant be done before cost calculation salary_band_next_financial_year may modify the next_sb object
-                    next_sb = next_sb.salary_band_after_increment()
-                
-
-            # update chargeable period date and band
-            next_increment = temp_next_increment
-
-        # Final salary cost for period not spanning a salary change
-        salary_value.add_staff_cost(salary_band=next_sb, from_date=next_increment, until_date=until_date, percentage=percentage)
-
-        return salary_value
-
-    def days_from_budget(self, start: date, budget: float, percent: float) -> int:
-        """
-        Get the number of days which this RSE can be charged given a budget and FTE
-        """
-
-        # Get the last salary grade charge for the RSE at the start of the cost query
-        sgc = self.lastSalaryGradeChange(start)
-        # Get the salary band at the start date of the cost query (will skip increments if required)
-        sb = sgc.salary_band_at_future_date(start)
-
-        total_days = 0
-        temp_budget = budget
-        temp_start = start
-        temp_salary_band = sb
-
-        # Loop through salary periods to calculate how many days the budget can afford
-        # Apply increments, financial year changes and salary grade changes
-        while temp_budget > 0:
-            # calculate date of next possible salary change (either by financial or calendar  year)
-            if temp_start.month < 8:
-                span_end = date(temp_start.year, 8, 1)
-                next_sb = temp_salary_band.salary_band_next_financial_year()
-            else:
-                span_end = date(temp_start.year + 1, 1, 1)
-                next_sb = temp_salary_band.salary_band_after_increment()
-
-            # if salary grade change before the next increment/FY change
-            temp_sgc = sgc.next_salary_grade_change(temp_start, span_end)
-            if temp_sgc:
-                span_end = temp_sgc.date
-                next_sb = temp_sgc.salary_band
-                sgc = temp_sgc
-
-            # daily salary rate in span
-            span_dr = float(temp_salary_band.salary) / 365.0
-            span_days = (span_end - temp_start).days
-            span_spend = span_dr * span_days * (percent / 100.0)
-
-            # can budget be spent within this period
-            if span_spend >= temp_budget:
-                # calculate exactly how many days can be afforded within this period and end loop
-                total_days += int(temp_budget / (span_dr * (percent / 100.0)))
-                temp_budget = 0     # end loop
-                break
-            else:
-                # accumulate days and deduct cost for this period and move to next
-                total_days += span_days
-                temp_budget -= span_spend
-                temp_start = span_end
-                temp_salary_band = next_sb
-
-        return total_days
 
     @property
     def colour_rbg(self) -> Dict[str, int]:
@@ -547,11 +371,6 @@ class DirectlyIncurredProject(Project):
     """
 
     @property
-    def chargeable(self):
-        """ Indicates if the project is chargeable in a cost distribution. I.e. Internal projects are not chargeable."""
-        return not self.internal
-
-    @property
     def duration(self) -> Optional[int]:
         """
         Duration is determined by start and end dates
@@ -566,46 +385,6 @@ class DirectlyIncurredProject(Project):
         """ Number of workings days in the project """
         """ Calculated by adjusting duration by TRAC """
         return Project.fte_days_to_working_days(self.duration)* self.fte / 100.0
-
-    def value(self) -> float:
-        """
-        Value represent staff costs and overhead is determined by project duration and salary cost of salary band used for costing
-        """
-
-        salary_costs = self.salary_band.staff_cost(self.start, self.end, percentage=self.percentage)
-        overheads = self.overhead_value()
-
-        return salary_costs.staff_cost + overheads
-
-    def staff_budget(self) -> float:
-        """
-        Function to calculate staff budget for an allocation project.
-        Represents total of salary costs for duration of project
-        """
-        salary_costs = self.salary_band.staff_cost(self.start, self.end, percentage=self.percentage)
-
-        return salary_costs.staff_cost
-
-    def overhead_value(self, from_date: date = None, until_date: date = None, percentage: float = None) -> float:
-        """
-        Function calculates the value of any overheads generated.
-        For directly incurred projects this is based on duration and a fixed overhead rate.
-        Cap the from and end dates according to the project as certain queries may have dates based on financial years rather than project dates
-        """
-
-        # internal projects have no overheads
-        if self.internal:
-            return 0
-
-        if from_date is None or from_date < self.start:
-            from_date = self.start
-        if until_date is None or until_date > self.end:
-            until_date = self.end
-        if percentage is None or percentage > 100.0:
-            percentage = self.percentage
-
-        # Use the static salary band function to convert days and rate into a value
-        return SalaryBand.salaryCost(days=(until_date - from_date).days, salary=self.overheads, percentage=percentage)
 
     @property
     def type_str(self) -> str:

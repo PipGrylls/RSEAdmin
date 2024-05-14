@@ -20,7 +20,6 @@ from django.conf import settings
 
 from rse.models import *
 from rse.forms import *
-from rse.views.helper import *
 
 ################################
 ### Projects and Allocations ###
@@ -68,9 +67,6 @@ def project(request: HttpRequest, project_id) -> HttpResponse:
         commitment_data.append((rse, RSEAllocation.commitment_summary(rse_allocations)))
     view_dict['commitment_data'] = commitment_data
 
-    # append salary and costs information for template
-    append_project_and_allocation_costs(request, proj, allocations)
-
     return render(request, 'project.html', view_dict)
 
 
@@ -79,7 +75,7 @@ def project_new_directly_incurred(request: HttpRequest) -> HttpResponse:
 
     # Dict for view
     view_dict = {}  # type: Dict[str, object]
-    
+
     # process or create form
     if request.method == 'POST' and 'project_submit' in request.POST:
         form = DirectlyIncurredProjectForm(request.POST)
@@ -151,11 +147,11 @@ def project_edit(request: HttpRequest, project_id) -> HttpResponse:
 def project_allocations_edit(request: HttpRequest, project_id) -> HttpResponse:
     # Get the project
     proj = get_object_or_404(Project, pk=project_id)
-    
+
     # Dict for view
     view_dict = {}  # type: Dict[str, object]
     view_dict['project'] = proj
-    
+
     # Create new allocation form for effort
     if request.method == 'POST':
         form = ProjectAllocationForm(request.POST, project=proj)
@@ -164,7 +160,7 @@ def project_allocations_edit(request: HttpRequest, project_id) -> HttpResponse:
             a = form.save(commit=False)
             a.project = proj
             a.save()
-            messages.add_message(request, messages.SUCCESS, f'New allocation created.')
+            messages.add_message(request, messages.SUCCESS, 'New allocation created.')
             # reset the form
             form = ProjectAllocationForm(project=proj)
     else:
@@ -173,30 +169,24 @@ def project_allocations_edit(request: HttpRequest, project_id) -> HttpResponse:
     # Get allocations for project
     allocations = RSEAllocation.objects.filter(project=proj)
     view_dict['allocations'] = allocations
-    
-    # append salary and costs information for template
-    append_project_and_allocation_costs(request, proj, allocations)
 
     view_dict['form'] = form
 
     return render(request, 'project_allocations_edit.html', view_dict)
 
+
 @user_passes_test(lambda u: u.is_superuser)
 def project_allocations(request: HttpRequest, project_id) -> HttpResponse:
     # Get the project
     proj = get_object_or_404(Project, pk=project_id)
-    
+
     # Dict for view
     view_dict = {}  # type: Dict[str, object]
     view_dict['project'] = proj
-    
+
     # Get allocations for project
     allocations = RSEAllocation.objects.filter(project=proj)
     view_dict['allocations'] = allocations
-
-    # append salary and costs information for template
-    append_project_and_allocation_costs(request, proj, allocations)
-
 
     return render(request, 'project_allocations.html', view_dict)
 
@@ -205,18 +195,18 @@ class project_allocations_delete(UserPassesTestMixin, DeleteView):
     """ POST only special delete view which redirects to project allocation view """
     model = RSEAllocation
     success_message = "Project allocation marked as deleted."
-    
+
     def test_func(self):
         """ Only for super users """
         return self.request.user.is_superuser
-        
+
     def get(self, request, *args, **kwargs):
         """ disable this view when arriving by get (i.e. only allow post) """
         raise Http404("Page does not exist")
-    
+
     def get_success_url(self):
         return reverse_lazy('project_allocations_edit', kwargs={'project_id': self.object.project.id})
-        
+
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, self.success_message)
         self.object = self.get_object()
@@ -225,12 +215,12 @@ class project_allocations_delete(UserPassesTestMixin, DeleteView):
         self.object.deleted_date = timezone.now()
         self.object.save()
         return HttpResponseRedirect(success_url)
-    
+
 class project_delete(UserPassesTestMixin, DeleteView):
     """ POST only special delete view which redirects to project allocation view """
     model = Project
     success_message = "Project deleted successfully."
-    
+
     def test_func(self):
         """ Only for super users """
         return self.request.user.is_superuser

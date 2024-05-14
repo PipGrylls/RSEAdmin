@@ -53,12 +53,6 @@
 									<span class="badge bg-red">No</span>
 								{% endif %}
 							</td>
-							{% if user.is_superuser %} 
-								<td>
-									<span class="grade blurred">{{rse.grade}}</span>
-									<a href="{% url 'rse_salary' rse.user.username %}" class="text-muted pull-right" data-toggle="tooltip" title="" data-original-title="Edit Salary Data"><i class="fa fa-edit"></i></a>
-								</td> 
-							{% endif %}
 							<td> 
 								<div class="progress progress-xs progress-striped active">
 									<div class="progress-bar progress-bar-primary" style="width: {{rse.current_capacity}}%"></div>
@@ -74,25 +68,6 @@
 			</div>
 		</div>
 	</div>
-
-	<div class="col-md-3">
-		<div class="box box-default">
-            <div class="box-header with-border">
-              	<h3 class="box-title">Options</h3>
-            </div>
-            <div class="box-body">
-              	<p><i>Toggle the visibility of grade points in this view. </i></p>
-			  	<div class="checkbox">
-                    <label>
-                      	<input type="checkbox" id="id_show_grade"> Show grade points
-					</label>
-                </div>
-            </div>
-        </div>
-	</div>
-
-	
-
 
 </div>
 

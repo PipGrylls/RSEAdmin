@@ -42,11 +42,9 @@ def progressbar_colour(value: float):
     elif value < 50.0:
         return "progress-bar-red"
     else:
-        return "progress-bar-yellow"    
-              
+        return "progress-bar-yellow"
 
-
-@register.filter      
+@register.filter
 def isrseuser(value):
     """ Return true for users who are RSEs. Value must eb a user. """
     try:
@@ -55,13 +53,17 @@ def isrseuser(value):
     except ObjectDoesNotExist:
         return False
 
+
 @register.filter
 def percent(value):
     return f"{value:.0f}"
 
+
 @register.filter
 def dp2(value):
+    print('the issue is', value)
     return f"{value:.2f}"
+
 
 @register.simple_tag
 def sum_project_allocation_percentage(project: Project, allocations: QuerySet):

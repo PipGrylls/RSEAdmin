@@ -20,7 +20,6 @@ from django.conf import settings
 
 from rse.models import *
 from rse.forms import *
-from rse.views.helper import *
 
 #################
 ### Homepage ####

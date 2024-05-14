@@ -20,7 +20,6 @@ from django.conf import settings
 
 from rse.models import *
 from rse.forms import *
-from rse.views.helper import *
 
 
 #######################
@@ -67,17 +66,14 @@ def user_new_rse(request: HttpRequest) -> HttpResponse:
             rse = rse_form.save(commit=False)
             rse.user = user
             rse.save()
-            # create a salary grade change for RSE
-            sgc = SalaryGradeChange(rse=rse, date=rse_form.cleaned_data["employed_from"], salary_band=rse_form.cleaned_data["salary_band"])
-            sgc.save()
             # confirmation message
             messages.add_message(request, messages.SUCCESS, f'New RSE user {user.username} created.')
             # Go to view of RSE salary grade changes
-            return HttpResponseRedirect(reverse_lazy('rse_salary', kwargs={'rse_username': user.username}))
+            return HttpResponseRedirect(reverse_lazy('rse', kwargs={'rse_username': user.username}))
                 
     else:
         user_form = NewUserForm()
-        rse_form = NewRSEUserForm() 
+        rse_form = NewRSEUserForm()
         
     view_dict['user_form'] = user_form
     view_dict['rse_form'] = rse_form

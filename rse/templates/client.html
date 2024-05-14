@@ -19,7 +19,7 @@
             <div class="box-header with-border">
               <h3 class="box-title"> Projects Associated with {{client.name}}</h3>
 			  
-			  <a id="id_add_client" href="{% url 'project_new' %}?client={{ client.id }}&next={% url 'client' client.id %}" class="fa fa-plus pull-right" data-toggle="tooltip" title="" data-original-title="Create a new project for this client"></a>
+			  <a id="id_add_client" href="{% url 'project_directly_incurred_new' %}?client={{ client.id }}&next={% url 'client' client.id %}" class="fa fa-plus pull-right" data-toggle="tooltip" title="" data-original-title="Create a new project for this client"></a>
             </div>
             <div class="box-body">
               

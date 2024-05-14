@@ -53,8 +53,9 @@ urlpatterns = [
     # View All Projects (list view)
     re_path(r'^projects$', projects.projects, name='projects'),
 
-    # Create DirectlyIncurred Project view
+    # Create DirectlyIncurred Project view (two urls for name consistency)
     re_path(r'^project/directly_incurred/new$', projects.project_new_directly_incurred, name='project_new_directly_incurred'),
+    re_path(r'^project/directly_incurred/new$', projects.project_new_directly_incurred, name='project_directly_incurred_new'),
 
     # Project view
     re_path(r'^project/(?P<project_id>[0-9]+)$', projects.project, name='project'),

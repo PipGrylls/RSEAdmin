@@ -62,21 +62,9 @@
 					<tr><td>
 							<p><strong>FTE Duration (Days):</strong> {{project.duration}} </p>
 					</td></tr>
-					<tr><td>
-							<p><strong>Staff Time Chargable to Service Account:</strong> {{project.charged}} </p>
-					</td></tr>
-					<tr><td>
-							<p><strong>Invoice Received Date:</strong> {{project.invoice_received}} </p>
-					</td></tr>
 						 {% else %}
 					<tr><td>
 							<p><strong>Allocated Percentage:</strong> {{project.percentage}}%</p>
-					</td></tr>
-					<tr><td>
-							<p><strong>Overhead Rate (pro-rata):</strong> £{{project.overheads|dp2}} </p>
-					</td></tr>
-					<tr><td>
-							<p><strong>Initial Salary Band:</strong> G{{project.salary_band.grade}}.{{project.salary_band.grade_point}} ({{project.salary_band.year.year}}) </p>
 					</td></tr>
 						 {% endif %}
 				</tbody>

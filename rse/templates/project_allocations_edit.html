@@ -74,9 +74,6 @@
 										<th id="internal">End Date</th>
 										<th id="title">FTE</th>
 										<th id="duration">Duration (Days)</th>
-										<th id="staff_cost">Staff Cost</th>
-										<th id="allocaton">Allocation of Staff Budget</th>
-										<th id="allocation_label"></th>
 										<th id="delete"></th>
 									</tr>
 								</thead>
@@ -88,14 +85,10 @@
 										<td>{{ a.end }}</td>
 										<td>{{ a.percentage }}</td>
 										<td>{{ a.duration }}</td>
-										<td>£{{ a.staff_cost|floatformat:2|intcomma }}</td>
 										<td>
 											<div class="progress progress-xs">
 												<div class="progress-bar progress-bar-primary " style="width: {{a.project_budget_percentage}}%"></div>
 											</div>
-										</td>
-										<td>
-											<span class="badge bg-light-blue">{{a.project_budget_percentage|dp2}} %</span>
 										</td>
 										<td>
 											<button type="button" class="btn btn-danger btn-xs pull-right" data-val="{{a.id}}" data-toggle="modal" data-target="#delete_modal">Delete</button>
@@ -116,7 +109,7 @@
 
 		<div class="row">
 			
-			<div class="col-md-4">
+			<div class="col-md-12">
 				<div class="box box-default">
 					<div class="box-header with-border">
 						<h3 class="box-title">Add an allocation</h3>
@@ -134,7 +127,7 @@
 								</div>
 								<br>
 
-								<label>End Date <span style="font-weight: normal">(inital value based on effort)<span>:</label>
+								<label>End Date <span style="font-weight: normal">(initial value based on effort)<span>:</label>
 								<div class="input-group">
 									<div class="input-group-addon">
 										<i class="fa fa-calendar"></i>
@@ -143,17 +136,12 @@
 									<div class="input-group-addon">
 										<a href="" id="id_end_effort_autocomplete" class="fa fa-clock-o" data-toggle="tooltip" title="Auto complete end date based on remaining FTE days of project"></a>
 									</div>
-									{% if not project.is_service %}
-										<div class="input-group-addon">
-											<a href="" id="id_end_budget_autocomplete" class="fa fa-calculator" data-toggle="tooltip" title="Auto complete end date based on remaining project budget"></a>
-										</div>
-									{% endif%}
 								</div>
 								<br>
 
 								<label>RSE:</label>
 								<div class="input-group">
-									{{ form.rse }} 
+									{{ form.rse }}
 									<div class="input-group-addon">
 										<a href="" id="id_rse_summary" target="_blank" class="fa fa-area-chart" data-toggle="tooltip" title="View RSE or Team commitment summary between allocation dates"></a>
 									</div>
@@ -211,7 +199,7 @@
 				<h4 class="modal-title" id="myModalLabel">Are you sure?</h4>
 			</div>
 			<div class="modal-body">
-				<p>Are you sure you wish to maark this allocation as deleted (this can not be undone)?</p>
+				<p>Are you sure you wish to mark this allocation as deleted (this can not be undone)?</p>
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn btn-outline pull-left" data-dismiss="modal">Cancel</button>
@@ -332,40 +320,12 @@
 		//stop postback
 		e.preventDefault();
 		//calculate new end date based off current start date
-		var fte_days = {{project.remaining_days}} / $('#id_percentage').val() * 100.0
+		var fte_days = {{project.remaining_days}} / $('#id_percentage').val() * 100.0;
 		var until = moment($('#id_start').val(), 'DD/MM/YYYY').add(fte_days, 'days');
 		$('#id_end').val(until.format('DD/MM/YYYY'));
 		//update information text
 		allocation_info_update();
 	});
-
-	{% if not project.is_service %}
-	//calculate end date click for BUDGET distribution
-	$('#id_end_budget_autocomplete').click(function(e){
-		//stop postback
-		e.preventDefault();
-		//check for a selected RSE
-		if (!$('#id_rse').val()){
-			alert("Select an RSE to calculate end date for the budget allocation!");
-		}
-		//start date
-		var start = moment($('#id_start').val(), 'DD/MM/YYYY');
-		//AJAX query to get number of RSE days 
-		$.ajax({
-			url: "{% url 'project_remaining_days' %}/{{project.id}}/" + $('#id_rse').val() + "/" + start.format('DD-MM-YYYY') + "/" + $('#id_percentage').val(),
-			type: "GET",
-			success: function(result){
-			var fte_days = result.days;
-			//update end date
-			var until = moment($('#id_start').val(), 'DD/MM/YYYY').add(fte_days, 'days');
-			$('#id_end').val(until.format('DD/MM/YYYY'));
-			//update information text
-			allocation_info_update();
-		}
-
-		});
-	});
-	{% endif %}
 	
 	//document ready set the initial commitment view url and tooltips
 	$( document ).ready(function() {

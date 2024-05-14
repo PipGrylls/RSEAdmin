@@ -20,24 +20,23 @@ from django.conf import settings
 
 from rse.models import *
 from rse.forms import *
-from rse.views.helper import *
 
 ###############
 ### Clients ###
 ###############
 
-    
+
 @login_required
 def clients(request: HttpRequest) -> HttpResponse:
     """
     Filters to be handled client side with DataTables
     """
-    
+
     clients = Client.objects.all()
-    
+
     return render(request, 'clients.html', { "clients": clients })
 
-    
+
 @login_required
 def client(request: HttpRequest, client_id) -> HttpResponse:
     # Get the project

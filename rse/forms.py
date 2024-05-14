@@ -186,19 +186,11 @@ class ProjectAllocationForm(forms.ModelForm):
         cleaned_data = super(ProjectAllocationForm, self).clean()
         errors = {}
 
-        # Check that the RSE has valid Salary data from the start date (i.e. a salary grade change exists which can be used to calculate salary)
-        if cleaned_data['start'] and cleaned_data['rse']:
-            rse = cleaned_data['rse']
-            try:
-                rse.futureSalaryBand(date=cleaned_data['start'])
-            except ValueError:
-                errors['start'] = ("The selected RSE has no salary information within the same financial year as the proposed start date")
-
         # Check that the RSE is employed for the duration of the allocation
         if cleaned_data['start'] and cleaned_data['start'] and cleaned_data['rse']:
             rse = cleaned_data['rse']
             if not rse.employed_from:
-                errors['start'] = ('RSE does not have a start date of employment (i.e. no salary grade change)')
+                errors['start'] = ('RSE does not have a start date of employment')
             elif rse.employed_from > cleaned_data['start']:
                 errors['start'] = ('Allocation start date is before RSE is employed')
             if rse.employed_until < cleaned_data['end']:
@@ -414,14 +406,16 @@ class EditRSEUserForm(forms.ModelForm):
     """
     Form to edit an RSE users. This is used alongside the new user form so does not extend it.
     """
-
+    employed_from = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
+                                     attrs={'class': 'form-control'}),
+                                     input_formats=('%d/%m/%Y',))
     employed_until = forms.DateField(widget=forms.DateInput(format=('%d/%m/%Y'),
                                      attrs={'class': 'form-control'}),
                                      input_formats=('%d/%m/%Y',))
 
     class Meta:
         model = RSE
-        fields = ['employed_until']
+        fields = ['employed_from', 'employed_until']
 
 
 class NewRSEUserForm(forms.ModelForm):
